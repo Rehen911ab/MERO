@@ -1,0 +1,56 @@
+hame: RDP
+orkflow_dispatch:
+TOUS.
+secure top.
+timeout-minutes: 3600 steps:
+- name: Configure Core RDP Settings
+Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -
+Value 0 -Force
+Set-ItemProperty -Path 'HKL:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name
+"UserAuthentication -Value 0 -Force
+Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name
+"SecurityLayer" -Value 0 -Force
+netsh advfirewall firewall delete rule name="RDP-Tailscale"
+netsh advfirewall firewall add rule name="RDP-Tailscale" dir=in action=allow protocol= TCP localport=3389
+Restart-Service -Name TermService -Force
+- name: Create RDP User with Static Password
+Spassword = "admin@123"
+SecurePass = ConvertTo-SecureString Spassword - AsPlainText -Force
+if (-not (Get-LocalUser -Name "TOOLBOXLAP" -ErrorAction SilentlyContinue)) (
+New-LocalUser -Name "TOOLBOXLAP* -Password SecurePass -AccountNeverExpires
+Add-LocalGroupMember -Group "Administrators" -Member "TOOLBOXLAP"
+Add-LocalGroupMember -Group "Remote Desktop Users" -Member "TOOLBOXLAP"
+echo "RDP_CREDS=User: TOOLBOXLAP | Password: Spassword" >> Senv:GITHUB_ENV
+if (-not (Get-LocalUser -Name "TOOLBOXLAP")) {
+Write-Error "User creation failed"
+exit 1
+- name: Install Tailscale run:
+StsUr|= =https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
+SinstallerPath = "Senv:TEMP\tailscale.msi"
+Invoke-WebRequest -Uri StsUrl -OutFile SinstallerPath
+Start-Process msiexec.exe ArgumentList "/T, ''SinstallerPath"*, /quiet, "/norestart" - Wait Remove-Item SinstallerPath -Force
+- name: Establish Tailscale Connection
+& "Senv:ProgramFiles\Tailscale\tailscale.exe" up -authkey=S secrets.TAILSCALE_AUTH_KEY / -hostname=gh-
+runner-Senv:GITHUB_RUN_ID
+StsIP = Snull
+Sretries = 0
+while (not StiP -and Sretries lt 10){
+StsIP = & "Senv:ProgramFiles\Tailscale\tailscale.exe" ip -4
+Start-Sleep -Seconds 5
+Sretries++
+if (not Sts/P) {
+exit 1
+Write-Error "Tailscale IP not assigned. Exiting."
+echo "TAILSCALE_IP=Sts|P" >> Senv:GITHUB_ENV
+- name: Verify RDP Accessibility
+Write-Host "Tailscale IP: Senv:TAILSCALE_IP"
+StestResult = Test-NetConnection -ComputerName Senv:TAILSCALE_IP -Port 3389
+if (-not StestResult.TcpTestSucceeded) (
+Write-Error "TCP connection to RDP port 3389 failed" exit 1
+Write-Host "TCP connectivity successful!"
+- name: Maintain Connection
+run: 1
+Write Host "n=== RDP ACCESS ==="
+Write-Host "Address: Senv:TAILSCALE_IP"
+Write-Host "Username: TOOLBOXLAP"
+Write-Host "Password: admin@123"
